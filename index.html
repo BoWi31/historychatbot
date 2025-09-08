@@ -163,7 +163,6 @@ async function sendMessage(){
 }
 
 async function getAnswer(q){
- await ensureEmbedder();
  try{
   const url='https://de.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(currentFigure);
   const res=await fetch(url);
@@ -188,17 +187,6 @@ async function getAnswer(q){
   return first+'.';
  }catch(e){
   return "Dazu kann ich dir leider nichts sagen.";
- }
-}
-
-let generator=null;
-async function ensureEmbedder(){
- if(generator) return;
- try{
-  const mod=await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0');
-  generator=mod;
- }catch(e){
-  generator=null;
  }
 }
 
