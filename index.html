@@ -38,246 +38,83 @@
   </div>
 
   <script>
-    const chatEl=document.getElementById('chat');
-    const inputEl=document.getElementById('input');
-    const sendBtn=document.getElementById('send');
-    const statusEl=document.getElementById('status');
+  // Clean script block replacing broken code
+  (function(){
+    var chatEl=document.getElementById('chat');
+    var inputEl=document.getElementById('input');
+    var sendBtn=document.getElementById('send');
+    var statusEl=document.getElementById('status');
+    var personNameEl=document.getElementById('personName');
 
-    function timeNow(){return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+    var PERSON={ name:'Marie Curie', titles:{ de:'Marie Curie', en:'Marie Curie', fr:'Marie Curie', pl:'Maria Skłodowska-Curie', ru:'Мария Склодовская-Кюри', ar:'ماري كوري', tr:'Marie Curie', ku:'Marie Curie' } };
 
-    function addBubble(text,who){
-      const div=document.createElement('div');
-      div.className='bubble '+(who==='me'?'me':'bot');
-      div.textContent=text;
-      const meta=document.createElement('div');
-      meta.className='meta';
-      meta.textContent=timeNow();
-      div.appendChild(meta);
-      chatEl.appendChild(div);
-      chatEl.scrollTop=chatEl.scrollHeight;
+    function timeNow(){ var d=new Date(); return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+    function addBubble(text, who){ var div=document.createElement('div'); div.className='bubble '+(who==='me'?'me':'bot'); div.textContent=text; var meta=document.createElement('div'); meta.className='meta'; meta.textContent=timeNow(); div.appendChild(meta); chatEl.appendChild(div); chatEl.scrollTop=chatEl.scrollHeight; return div; }
+
+    function detectLang(text){ var t=(text||'').toLowerCase(); var score={de:0,en:0,fr:0,pl:0,ru:0,ar:0,tr:0,ku:0};
+      function bump(arr,k){ for(var i=0;i<arr.length;i++){ if(t.indexOf(arr[i])>-1) score[k]++; } }
+      bump(['wer','wann','wo','warum','wie','erkläre','geburt','geboren','nobel','forschung'],'de');
+      bump(['who','when','where','why','how','explain','born','birth','nobel','research'],'en');
+      bump(['qui','quand','où','pourquoi','comment','née','naissance'],'fr');
+      bump(['kto','kiedy','gdzie','dlaczego','jak','urodzona','urodził','urodziła'],'pl');
+      bump(['кто','когда','где','почему','как','родил','родилась'],'ru');
+      bump(['من','متى','أين','لماذا','كيف','ولدت'],'ar');
+      bump(['kim','ne zaman','nerede','neden','nasıl','doğdu'],'tr');
+      bump(['kî','kengî','li ku','çima','çawa','jidayikbû'],'ku');
+      for(var i=0;i<t.length;i++){ var c=t.charCodeAt(i); if(c>=1024&&c<=1279) score.ru+=2; if(c>=1536&&c<=1791) score.ar+=2; }
+      var arr=Object.entries(score).sort(function(a,b){ return b[1]-a[1]; });
+      return arr[0][1]>0 ? arr[0][0] : 'de';
     }
-
-    function detectLang(text){
-      const t=(text||'').toLowerCase();
-      const score={de:0,en:0,fr:0,pl:0,ru:0,ar:0,tr:0,ku:0};
-      if(/[\u0400-\u04FF]/.test(t)) score.ru+=2;
-      if(/[\u0600-\u06FF]/.test(t)) score.ar+=2;
-      if(t.includes('kim')||t.includes('neden')) score.tr++;
-      if(t.includes('من')||t.includes('لماذا')) score.ar++;
-      if(t.includes('кто')||t.includes('почему')) score.ru++;
-      if(t.includes('wer')||t.includes('wann')) score.de++;
-      if(t.includes('who')||t.includes('when')) score.en++;
-      const best=Object.entries(score).sort((a,b)=>b[1]-a[1])[0];
-      return best[1]===0?'de':best[0];
-    }
-
-    function langHost(lang){
-      const map={de:'de',en:'en',fr:'fr',pl:'pl',ru:'ru',ar:'ar',tr:'tr',ku:'ku'};
-      return (map[lang]||'de')+'.wikipedia.org';
-    }
+    function langHost(lang){ var map={de:'de',en:'en',fr:'fr',pl:'pl',ru:'ru',ar:'ar',tr:'tr',ku:'ku'}; return (map[lang]||'de')+'.wikipedia.org'; }
+    function getTitleByLang(lang){ var t=PERSON.titles||{}; return t[lang]||PERSON.name; }
 
     async function fetchShortBio(lang){
-      const host=langHost(lang);
-      const url=`https://${host}/w/api.php?action=query&prop=extracts&explaintext=1&exsentences=3&titles=Marie%20Curie&format=json&origin=*`;
-      const r=await fetch(url);const j=await r.json();
-      const page=Object.values(j.query.pages)[0];
-      return page.extract||'';
+      var host=langHost(lang); var title=encodeURIComponent(getTitleByLang(lang));
+      var url='https://'+host+'/w/api.php?action=query&prop=extracts&explaintext=1&exsentences=3&titles='+title+'&format=json&origin=*';
+      var r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); var j=await r.json(); var page=Object.values(j.query.pages)[0]; return page.extract||'';
+    }
+    async function fetchMoreBio(lang, n){
+      var host=langHost(lang); var title=encodeURIComponent(getTitleByLang(lang));
+      var url='https://'+host+'/w/api.php?action=query&prop=extracts&explaintext=1&exsentences='+(n||12)+'&titles='+title+'&format=json&origin=*';
+      var r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status); var j=await r.json(); var page=Object.values(j.query.pages)[0]; return page.extract||'';
     }
 
-    async function fetchMoreBio(lang, sentences){
-      const host = langHost(lang);
-      const title = encodeURIComponent(getTitleByLang(lang));
-      const n = sentences || 18;
-      const url = `https://${host}/w/api.php?action=query&prop=extracts&explaintext=1&exsentences=${n}&titles=${title}&format=json&origin=*`;
-      const r = await fetch(url);
-      const j = await r.json();
-      const page = Object.values(j.query.pages)[0];
-      return page.extract || '';
-    }
-    function splitSentences(text){
-      const out = [];
-      let cur = '';
-      const enders = ['.','!','?','؟'];
-      for(const ch of (text||'')){
-        cur += ch;
-        if(enders.indexOf(ch) > -1){
-          if(cur.trim()) out.push(cur.trim());
-          cur = '';
-        }
-      }
-      if(cur.trim()) out.push(cur.trim());
-      return out;
-    }
-    function simplify(text){
-      const s = (text||'');
-      let out = '';
-      let prevSpace = false;
-      for(let i=0;i<s.length;i++){
-        const ch = s[i];
-        const isWs = (ch===' '||ch==='
-'||ch==='	'||ch==='
-');
-        if(isWs){
-          if(!prevSpace){ out += ' '; prevSpace = true; }
-        } else { out += ch; prevSpace = false; }
-      }
-      return out.trim();
-    }
-    function toFirstPersonBirth(extract, lang){
-      const x = simplify(extract);
-      const starIdx = x.indexOf('(*');
-      if(starIdx > -1){
-        const close = x.indexOf(')', starIdx+2);
-        if(close > -1){
-          let chunk = x.slice(starIdx+2, close);
-          const alsIdx = chunk.toLowerCase().indexOf(' als ');
-          if(alsIdx > -1) chunk = chunk.slice(0, alsIdx);
-          const parts = chunk.split(',');
-          if(parts.length>1) chunk = parts[0];
-          chunk = chunk.trim();
-          if(lang==='de') return 'Ich wurde am ' + chunk + ' geboren.';
-          if(lang==='en') return 'I was born on ' + chunk + '.';
-          if(lang==='fr') return 'Je suis née le ' + chunk + '.';
-          if(lang==='pl') return 'Urodziłam się ' + chunk + '.';
-          if(lang==='ru') return 'Я родилась ' + chunk + '.';
-          if(lang==='ar') return 'وُلدتُ في ' + chunk + '.';
-          if(lang==='tr') return chunk + ' doğdum.';
-          if(lang==='ku') return 'Ez li ' + chunk + ' jidayik bûm.';
-        }
-      }
-      const sents = splitSentences(x).filter(s=>{
-        const low = s.toLowerCase();
-        return low.indexOf('gebor')>-1 || low.indexOf('born')>-1 || low.indexOf('née')>-1 || low.indexOf('urodz')>-1 || low.indexOf('родил')>-1 || low.indexOf('ولدت')>-1;
-      });
+    function splitSentences(text){ var out=[], cur=''; var enders=['.','!','?','؟']; var s=text||''; for(var i=0;i<s.length;i++){ var ch=s[i]; cur+=ch; if(enders.indexOf(ch)>-1){ if(cur.trim()) out.push(cur.trim()); cur=''; } } if(cur.trim()) out.push(cur.trim()); return out; }
+    function simplify(text){ var s=text||''; var out='', prev=false; for(var i=0;i<s.length;i++){ var code=s.charCodeAt(i); var ws=(code===32||code===9||code===10||code===13); if(ws){ if(!prev){ out+=' '; prev=true; } } else { out+=s[i]; prev=false; } } return out.trim(); }
+
+    function toFirstPersonBirth(extract, lang){ var x=simplify(extract); var starIdx=x.indexOf('(*'); if(starIdx>-1){ var close=x.indexOf(')', starIdx+2); if(close>-1){ var chunk=x.slice(starIdx+2, close); var alsIdx=chunk.toLowerCase().indexOf(' als '); if(alsIdx>-1) chunk=chunk.slice(0,alsIdx); var parts=chunk.split(','); if(parts.length>1) chunk=parts[0]; chunk=chunk.trim(); if(lang==='de') return 'Ich wurde am '+chunk+' geboren.'; if(lang==='en') return 'I was born on '+chunk+'.'; if(lang==='fr') return 'Je suis née le '+chunk+'.'; if(lang==='pl') return 'Urodziłam się '+chunk+'.'; if(lang==='ru') return 'Я родилась '+chunk+'.'; if(lang==='ar') return 'وُلدتُ في '+chunk+'.'; if(lang==='tr') return chunk+' doğdum.'; if(lang==='ku') return 'Ez li '+chunk+' jidayik bûm.'; } }
+      var sents=splitSentences(x).filter(function(s){ var low=s.toLowerCase(); return low.indexOf('gebor')>-1||low.indexOf('born')>-1||low.indexOf('née')>-1||low.indexOf('urodz')>-1||low.indexOf('родил')>-1||low.indexOf('ولدت')>-1; });
       return sents.slice(0,2).join(' ');
     }
-    function extractByKeywords(extract, keys, max){
-      const sents = splitSentences(simplify(extract));
-      const out = [];
-      const m = max || 3;
-      for(const s of sents){
-        const low = s.toLowerCase();
-        if(keys.some(k=> low.indexOf(k)>-1 )){ out.push(s); if(out.length>=m) break; }
-      }
-      if(out.length===0) return sents.slice(0,2).join(' ');
-      return out.join(' ');
-    }
+    function extractByKeywords(extract, keys, max){ var sents=splitSentences(simplify(extract)); var out=[]; for(var i=0;i<sents.length;i++){ var s=sents[i]; var low=s.toLowerCase(); var hit=false; for(var k=0;k<keys.length;k++){ if(low.indexOf(keys[k])>-1){ hit=true; break; } } if(hit){ out.push(s); if(out.length>=(max||3)) break; } } return out.length?out.join(' '):sents.slice(0,2).join(' '); }
+
     async function fetchFact(lang, topic){
-      const base = await fetchMoreBio(lang, 18);
-      const q = (topic||'').toLowerCase();
-      const birthK = ['gebor','geburt','born','birth','née','urodz','родил','родила','ولدت'];
-      const nobelK = ['nobel','preis','award','prix','nagroda','نوبل'];
-      const spouseK = ['pierre','ehemann','husband','époux','mąż','زوج'];
-      const workK = ['polonium','radium','radioaktiv','radioactivity','radioactivité','promieniotwórc','radiow','радиоактив','مشع','radyoakt','polonyum','radyum'];
-      const workTriggers = ['erfunden','entdeck','discover','invent','découv','odkry','keşfet'];
-      const childK = ['tochter','irène','ève','daughter','córka','дочь','ابنة'];
-      if(birthK.some(k=> q.indexOf(k)>-1 )) return toFirstPersonBirth(base, lang);
-      if(nobelK.some(k=> q.indexOf(k)>-1 )) return extractByKeywords(base, nobelK, 3);
-      if(spouseK.some(k=> q.indexOf(k)>-1 )) return extractByKeywords(base, spouseK, 3);
-      if(childK.some(k=> q.indexOf(k)>-1 )) return extractByKeywords(base, childK, 3);
-      if(workTriggers.some(k=> q.indexOf(k)>-1 ) || workK.some(k=> base.toLowerCase().indexOf(k)>-1)) return extractByKeywords(base, workK, 3);
+      var base=await fetchMoreBio(lang, 18); var q=(topic||'').toLowerCase();
+      var birthK=['gebor','geburt','born','birth','née','urodz','родил','родила','ولدت'];
+      var nobelK=['nobel','preis','award','prix','nagroda','نوبل'];
+      var spouseK=['pierre','ehemann','husband','époux','mąż','زوج'];
+      var workK=['polonium','radium','radioaktiv','radioactivity','radioactivité','promieniotwórc','radiow','радиоактив','مشع','radyoakt','polonyum','radyum'];
+      var workTriggers=['erfunden','entdeck','discover','invent','découv','odkry','keşfet'];
+      var childK=['tochter','irène','ève','daughter','córka','дочь','ابنة'];
+      function hasAny(arr){ for(var i=0;i<arr.length;i++){ if(q.indexOf(arr[i])>-1) return true; } return false; }
+      if(hasAny(birthK)) return toFirstPersonBirth(base, lang);
+      if(hasAny(nobelK)) return extractByKeywords(base, nobelK, 3);
+      if(hasAny(spouseK)) return extractByKeywords(base, spouseK, 3);
+      if(hasAny(childK)) return extractByKeywords(base, childK, 3);
+      for(var w=0;w<workTriggers.length;w++){ if(q.indexOf(workTriggers[w])>-1) return extractByKeywords(base, workK, 3); }
+      for(var w2=0;w2<workK.length;w2++){ if(base.toLowerCase().indexOf(workK[w2])>-1) return extractByKeywords(base, workK, 3); }
       return splitSentences(simplify(base)).slice(0,3).join(' ');
-    }/w/api.php?action=query&prop=extracts&explaintext=1&exsentences=5&titles=Marie%20Curie&format=json&origin=*`;
-      const r=await fetch(url);const j=await r.json();
-      const page=Object.values(j.query.pages)[0];
-      return page.extract||'';
     }
 
-    function firstPersonizeIntro(text, lang){
-      const title = getTitleByLang(lang);
-      const sents = splitSentences(text||'');
-      const first = (sents[0]||'').trim();
-      let rest = first;
-      const variants=[title,'Marie Curie','Maria Skłodowska-Curie','Marie Skłodowska Curie','Мария Склодовская-Кюри','ماري كوري'];
-      for(const v of variants){
-        const low = rest.toLowerCase(); const vl = v.toLowerCase();
-        if(low.indexOf(vl)===0){ rest = rest.slice(v.length).trim(); if(rest[0]==='—'||rest[0]==='-'||rest[0]===',') rest = rest.slice(1).trim(); }
-      }
-      // strip any parenthetical segments like (* ... ) or ( ... )
-      function stripParens(s){ let out='', depth=0; for(const ch of s){ if(ch==='('){ depth++; continue; } if(ch===')'){ if(depth>0) depth--; continue; } if(depth===0) out+=ch; } return out.trim(); }
-      let cleaned = stripParens(rest);
-      if(lang==='ar') return 'أنا '+title+'. '+cleaned;
-      if(lang==='tr') return 'Ben '+title+'’yim. '+cleaned;
-      if(lang==='pl') return 'Jestem '+title+'. '+cleaned;
-      if(lang==='fr') return 'Je suis '+title+'. '+cleaned;
-      if(lang==='ru') return 'Я — '+title+'. '+cleaned;
-      if(lang==='ku') return 'Ez '+title+' me. '+cleaned;
-      if(lang==='en') return 'I am '+title+'. '+cleaned;
-      return 'Ich bin '+title+'. '+cleaned;
-    }
-      }
-      if(lang==='ar') return 'أنا '+title+'. '+rest;
-      if(lang==='tr') return 'Ben '+title+'’yim. '+rest;
-      if(lang==='pl') return 'Jestem '+title+'. '+rest;
-      if(lang==='fr') return 'Je suis '+title+'. '+rest;
-      if(lang==='ru') return 'Я — '+title+'. '+rest;
-      if(lang==='ku') return 'Ez '+title+' me. '+rest;
-      if(lang==='en') return 'I am '+title+'. '+rest;
-      return 'Ich bin '+title+'. '+rest;
-    }
-      }
-      if(lang==='ar') return 'أنا '+title+'. '+rest;
-      if(lang==='tr') return 'Ben '+title+'’yim. '+rest;
-      if(lang==='pl') return 'Jestem '+title+'. '+rest;
-      if(lang==='fr') return 'Je suis '+title+'. '+rest;
-      if(lang==='ru') return 'Я — '+title+'. '+rest;
-      if(lang==='ku') return 'Ez '+title+' me. '+rest;
-      if(lang==='en') return 'I am '+title+'. '+rest;
-      return 'Ich bin '+title+'. '+rest;
-    }
+    async function botAnswer(msg){ var lang=detectLang(msg); statusEl.textContent='tippt…'; try{ var q=(msg||'').trim(); var reply=''; if(q.toLowerCase().indexOf('erkläre das genauer')>-1 || q.toLowerCase().indexOf('explain more')>-1 || q.toLowerCase().indexOf('mehr anzeigen')>-1){ reply=splitSentences(simplify(await fetchMoreBio(lang, 22))).slice(0,8).join(' '); } else if(q.toLowerCase().indexOf('wer bist du')>-1 || q.toLowerCase().indexOf('who are you')>-1){ reply=splitSentences(simplify(await fetchShortBio(lang))).slice(0,2).join(' '); } else { reply=await fetchFact(lang, q); } addBubble(reply,'bot'); } catch(e){ addBubble('Entschuldige, der Abruf war gestört. Bitte versuche es erneut.','bot'); } finally{ statusEl.textContent='online'; } }
 
-    async function botAnswer(msg){
-      const lang = detectLang(msg);
-      statusEl.textContent = 'tippt…';
-      try{
-        const q = (msg||'').toLowerCase();
-        let reply = '';
-        const askMore = (q.indexOf('erkläre das genauer')>-1 || q.indexOf('explain more')>-1 || q.indexOf('mehr anzeigen')>-1);
-        if(askMore){
-          const more = await fetchMoreBio(lang, 22);
-          const s = splitSentences(more);
-          reply = s.slice(0,8).join(' ');
-        } else if(q.indexOf('wer bist du')>-1 || q.indexOf('who are you')>-1){
-          const ex = await fetchShortBio(lang);
-          reply = firstPersonizeIntro(ex, lang);
-        } else {
-          // Route all other fachlichen Fragen über fetchFact (Wikipedia-basiert)
-          reply = await fetchFact(lang, q);
-        }
-        addBubble(reply,'bot');
-      } catch(e){
-        addBubble('Entschuldige, der Abruf war gestört. Bitte versuche es erneut.','bot');
-      } finally { statusEl.textContent='online'; }
-    } else if(q.indexOf('wer bist du')>-1 || q.indexOf('who are you')>-1){
-          const ex = await fetchShortBio(lang);
-          reply = firstPersonizeIntro(ex, lang);
-        } else {
-          reply = await fetchFact(lang, q);
-        }
-        addBubble(reply,'bot');
-      } catch(e){
-        addBubble('Entschuldige, der Abruf war gestört. Bitte versuche es erneut.','bot');
-      } finally { statusEl.textContent='online'; }
-    }
+    async function send(){ var v=inputEl.value.trim(); if(!v) return; addBubble(v,'me'); inputEl.value=''; await botAnswer(v); }
+    sendBtn.addEventListener('click', send);
+    inputEl.addEventListener('keydown', function(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
 
-    function intro(){
-      // Startet bewusst mit einfacher Begrüßung; inhaltliche Antworten kommen weiterhin aus Wikipedia
-      try { nameEl.textContent = currentPerson.name; avatarEl.src = currentPerson.avatar; } catch(e) {}
-      addBubble('Hallo, ich bin ' + (currentPerson.name || 'Marie Curie') + ', hast du eine Frage?','bot');
-    }).catch(()=>{ addBubble('Bonjour. Ich bin Marie Curie. Stelle mir Fragen zu meinem Leben und meiner Arbeit – kurz und klar.','bot'); });
-    });
-    }
-
-    async function send(){
-      const v=inputEl.value.trim();if(!v) return;
-      addBubble(v,'me');inputEl.value='';
-      await botAnswer(v);
-    }
-
-    sendBtn.addEventListener('click',send);
-    inputEl.addEventListener('keydown',e=>{if(e.key==='Enter'){send();}});
-
+    function intro(){ personNameEl.textContent=PERSON.name; addBubble('Hallo, ich bin '+PERSON.name+', hast du eine Frage?','bot'); }
     intro();
-  </script>
+  })();
+</script>
 </body>
 </html>
