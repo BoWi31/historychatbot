@@ -84,38 +84,188 @@
       return page.extract||'';
     }
 
-    async function fetchFact(lang){
-      const host=langHost(lang);
-      const url=`https://${host}/w/api.php?action=query&prop=extracts&explaintext=1&exsentences=5&titles=Marie%20Curie&format=json&origin=*`;
+    async function fetchMoreBio(lang, sentences){
+      const host = langHost(lang);
+      const title = encodeURIComponent(getTitleByLang(lang));
+      const n = sentences || 18;
+      const url = `https://${host}/w/api.php?action=query&prop=extracts&explaintext=1&exsentences=${n}&titles=${title}&format=json&origin=*`;
+      const r = await fetch(url);
+      const j = await r.json();
+      const page = Object.values(j.query.pages)[0];
+      return page.extract || '';
+    }
+    function splitSentences(text){
+      const out = [];
+      let cur = '';
+      const enders = ['.','!','?','؟'];
+      for(const ch of (text||'')){
+        cur += ch;
+        if(enders.indexOf(ch) > -1){
+          if(cur.trim()) out.push(cur.trim());
+          cur = '';
+        }
+      }
+      if(cur.trim()) out.push(cur.trim());
+      return out;
+    }
+    function simplify(text){
+      const s = (text||'');
+      let out = '';
+      let prevSpace = false;
+      for(let i=0;i<s.length;i++){
+        const ch = s[i];
+        const isWs = (ch===' '||ch==='
+'||ch==='	'||ch==='
+');
+        if(isWs){
+          if(!prevSpace){ out += ' '; prevSpace = true; }
+        } else { out += ch; prevSpace = false; }
+      }
+      return out.trim();
+    }
+    function toFirstPersonBirth(extract, lang){
+      const x = simplify(extract);
+      const starIdx = x.indexOf('(*');
+      if(starIdx > -1){
+        const close = x.indexOf(')', starIdx+2);
+        if(close > -1){
+          let chunk = x.slice(starIdx+2, close);
+          const alsIdx = chunk.toLowerCase().indexOf(' als ');
+          if(alsIdx > -1) chunk = chunk.slice(0, alsIdx);
+          const parts = chunk.split(',');
+          if(parts.length>1) chunk = parts[0];
+          chunk = chunk.trim();
+          if(lang==='de') return 'Ich wurde am ' + chunk + ' geboren.';
+          if(lang==='en') return 'I was born on ' + chunk + '.';
+          if(lang==='fr') return 'Je suis née le ' + chunk + '.';
+          if(lang==='pl') return 'Urodziłam się ' + chunk + '.';
+          if(lang==='ru') return 'Я родилась ' + chunk + '.';
+          if(lang==='ar') return 'وُلدتُ في ' + chunk + '.';
+          if(lang==='tr') return chunk + ' doğdum.';
+          if(lang==='ku') return 'Ez li ' + chunk + ' jidayik bûm.';
+        }
+      }
+      const sents = splitSentences(x).filter(s=>{
+        const low = s.toLowerCase();
+        return low.indexOf('gebor')>-1 || low.indexOf('born')>-1 || low.indexOf('née')>-1 || low.indexOf('urodz')>-1 || low.indexOf('родил')>-1 || low.indexOf('ولدت')>-1;
+      });
+      return sents.slice(0,2).join(' ');
+    }
+    function extractByKeywords(extract, keys, max){
+      const sents = splitSentences(simplify(extract));
+      const out = [];
+      const m = max || 3;
+      for(const s of sents){
+        const low = s.toLowerCase();
+        if(keys.some(k=> low.indexOf(k)>-1 )){ out.push(s); if(out.length>=m) break; }
+      }
+      if(out.length===0) return sents.slice(0,2).join(' ');
+      return out.join(' ');
+    }
+    async function fetchFact(lang, topic){
+      const base = await fetchMoreBio(lang, 18);
+      const q = (topic||'').toLowerCase();
+      const birthK = ['gebor','geburt','born','birth','née','urodz','родил','родила','ولدت'];
+      const nobelK = ['nobel','preis','award','prix','nagroda','نوبل'];
+      const spouseK = ['pierre','ehemann','husband','époux','mąż','زوج'];
+      const workK = ['polonium','radium','radioaktiv','radioactivity','radioactivité','promieniotwórc','radiow','радиоактив','مشع','radyoakt','polonyum','radyum'];
+      const workTriggers = ['erfunden','entdeck','discover','invent','découv','odkry','keşfet'];
+      const childK = ['tochter','irène','ève','daughter','córka','дочь','ابنة'];
+      if(birthK.some(k=> q.indexOf(k)>-1 )) return toFirstPersonBirth(base, lang);
+      if(nobelK.some(k=> q.indexOf(k)>-1 )) return extractByKeywords(base, nobelK, 3);
+      if(spouseK.some(k=> q.indexOf(k)>-1 )) return extractByKeywords(base, spouseK, 3);
+      if(childK.some(k=> q.indexOf(k)>-1 )) return extractByKeywords(base, childK, 3);
+      if(workTriggers.some(k=> q.indexOf(k)>-1 ) || workK.some(k=> base.toLowerCase().indexOf(k)>-1)) return extractByKeywords(base, workK, 3);
+      return splitSentences(simplify(base)).slice(0,3).join(' ');
+    }/w/api.php?action=query&prop=extracts&explaintext=1&exsentences=5&titles=Marie%20Curie&format=json&origin=*`;
       const r=await fetch(url);const j=await r.json();
       const page=Object.values(j.query.pages)[0];
       return page.extract||'';
     }
 
-    function firstPersonize(text,lang){
-      if(lang==='de') return 'Ich bin Marie Curie. '+text;
-      if(lang==='fr') return "Je suis Marie Curie. "+text;
-      if(lang==='pl') return 'Jestem Maria Skłodowska-Curie. '+text;
-      if(lang==='ru') return 'Я — Мария Кюри. '+text;
-      if(lang==='ar') return 'أنا ماري كوري. '+text;
-      if(lang==='tr') return 'Ben Marie Curie’yim. '+text;
-      if(lang==='ku') return 'Ez Marie Curie me. '+text;
-      return 'I am Marie Curie. '+text;
+    function firstPersonizeIntro(text, lang){
+      const title = getTitleByLang(lang);
+      const sents = splitSentences(text||'');
+      const first = (sents[0]||'').trim();
+      let rest = first;
+      const variants=[title,'Marie Curie','Maria Skłodowska-Curie','Marie Skłodowska Curie','Мария Склодовская-Кюри','ماري كوري'];
+      for(const v of variants){
+        const low = rest.toLowerCase(); const vl = v.toLowerCase();
+        if(low.indexOf(vl)===0){ rest = rest.slice(v.length).trim(); if(rest[0]==='—'||rest[0]==='-'||rest[0]===',') rest = rest.slice(1).trim(); }
+      }
+      // strip any parenthetical segments like (* ... ) or ( ... )
+      function stripParens(s){ let out='', depth=0; for(const ch of s){ if(ch==='('){ depth++; continue; } if(ch===')'){ if(depth>0) depth--; continue; } if(depth===0) out+=ch; } return out.trim(); }
+      let cleaned = stripParens(rest);
+      if(lang==='ar') return 'أنا '+title+'. '+cleaned;
+      if(lang==='tr') return 'Ben '+title+'’yim. '+cleaned;
+      if(lang==='pl') return 'Jestem '+title+'. '+cleaned;
+      if(lang==='fr') return 'Je suis '+title+'. '+cleaned;
+      if(lang==='ru') return 'Я — '+title+'. '+cleaned;
+      if(lang==='ku') return 'Ez '+title+' me. '+cleaned;
+      if(lang==='en') return 'I am '+title+'. '+cleaned;
+      return 'Ich bin '+title+'. '+cleaned;
+    }
+      }
+      if(lang==='ar') return 'أنا '+title+'. '+rest;
+      if(lang==='tr') return 'Ben '+title+'’yim. '+rest;
+      if(lang==='pl') return 'Jestem '+title+'. '+rest;
+      if(lang==='fr') return 'Je suis '+title+'. '+rest;
+      if(lang==='ru') return 'Я — '+title+'. '+rest;
+      if(lang==='ku') return 'Ez '+title+' me. '+rest;
+      if(lang==='en') return 'I am '+title+'. '+rest;
+      return 'Ich bin '+title+'. '+rest;
+    }
+      }
+      if(lang==='ar') return 'أنا '+title+'. '+rest;
+      if(lang==='tr') return 'Ben '+title+'’yim. '+rest;
+      if(lang==='pl') return 'Jestem '+title+'. '+rest;
+      if(lang==='fr') return 'Je suis '+title+'. '+rest;
+      if(lang==='ru') return 'Я — '+title+'. '+rest;
+      if(lang==='ku') return 'Ez '+title+' me. '+rest;
+      if(lang==='en') return 'I am '+title+'. '+rest;
+      return 'Ich bin '+title+'. '+rest;
     }
 
     async function botAnswer(msg){
-      const lang=detectLang(msg);
-      statusEl.textContent='tippt…';
-      const fact=await fetchFact(lang);
-      const reply=firstPersonize(fact,lang);
-      addBubble(reply,'bot');
-      statusEl.textContent='online';
+      const lang = detectLang(msg);
+      statusEl.textContent = 'tippt…';
+      try{
+        const q = (msg||'').toLowerCase();
+        let reply = '';
+        const askMore = (q.indexOf('erkläre das genauer')>-1 || q.indexOf('explain more')>-1 || q.indexOf('mehr anzeigen')>-1);
+        if(askMore){
+          const more = await fetchMoreBio(lang, 22);
+          const s = splitSentences(more);
+          reply = s.slice(0,8).join(' ');
+        } else if(q.indexOf('wer bist du')>-1 || q.indexOf('who are you')>-1){
+          const ex = await fetchShortBio(lang);
+          reply = firstPersonizeIntro(ex, lang);
+        } else {
+          // Route all other fachlichen Fragen über fetchFact (Wikipedia-basiert)
+          reply = await fetchFact(lang, q);
+        }
+        addBubble(reply,'bot');
+      } catch(e){
+        addBubble('Entschuldige, der Abruf war gestört. Bitte versuche es erneut.','bot');
+      } finally { statusEl.textContent='online'; }
+    } else if(q.indexOf('wer bist du')>-1 || q.indexOf('who are you')>-1){
+          const ex = await fetchShortBio(lang);
+          reply = firstPersonizeIntro(ex, lang);
+        } else {
+          reply = await fetchFact(lang, q);
+        }
+        addBubble(reply,'bot');
+      } catch(e){
+        addBubble('Entschuldige, der Abruf war gestört. Bitte versuche es erneut.','bot');
+      } finally { statusEl.textContent='online'; }
     }
 
     function intro(){
-      fetchShortBio('de').then(ex=>{
-        addBubble(firstPersonize(ex,'de'),'bot');
-      });
+      // Startet bewusst mit einfacher Begrüßung; inhaltliche Antworten kommen weiterhin aus Wikipedia
+      try { nameEl.textContent = currentPerson.name; avatarEl.src = currentPerson.avatar; } catch(e) {}
+      addBubble('Hallo, ich bin ' + (currentPerson.name || 'Marie Curie') + ', hast du eine Frage?','bot');
+    }).catch(()=>{ addBubble('Bonjour. Ich bin Marie Curie. Stelle mir Fragen zu meinem Leben und meiner Arbeit – kurz und klar.','bot'); });
+    });
     }
 
     async function send(){
