@@ -1,215 +1,278 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8">
-<title>Historischer WhatsApp-Chatbot</title>
-<style>
-body,html{height:100%;margin:0;font-family:sans-serif;background:#e5ddd5;}
-.hidden{display:none;}
-#start-screen,#chat-screen{height:100%;}
-#start-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;}
-#start-screen input{margin:5px;padding:10px;width:80%;}
-#tiles{display:flex;flex-wrap:wrap;justify-content:center;}
-.tile{width:100px;height:120px;border:1px solid #ccc;margin:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;cursor:pointer;}
-.tile img{width:60px;height:60px;border-radius:50%;object-fit:cover;margin-bottom:5px;}
-#chat-screen{display:flex;flex-direction:column;}
-header{background:#075E54;color:#fff;padding:10px;display:flex;align-items:center;}
-header img{width:40px;height:40px;border-radius:50%;margin-right:10px;object-fit:cover;}
-main{flex:1;overflow-y:auto;padding:10px;}
-.bubble{max-width:80%;padding:8px;border-radius:5px;margin:5px;}
-.user{background:#dcf8c6;margin-left:auto;}
-.bot{background:#fff;margin-right:auto;}
-footer{display:flex;align-items:center;padding:5px;background:#f0f0f0;}
-footer button{background:none;border:none;font-size:1.4em;cursor:pointer;margin:0 5px;}
-footer input{flex:1;padding:8px;border-radius:20px;border:1px solid #ccc;}
-#emoji-bar{display:flex;justify-content:center;background:#f0f0f0;}
-#emoji-bar button{background:none;border:none;font-size:1.2em;cursor:pointer;margin:5px;}
-#teacher-panel{position:fixed;top:10px;right:10px;background:#fff;border:1px solid #ccc;padding:10px;}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Historischer Chatbot – Marie Curie</title>
+  <style>
+    :root{ --bg:#eae6df; --panel:#f0f2f5; --me:#d9fdd3; --bot:#ffffff; --accent:#25d366; --border:#d1d7db; --text:#111; --muted:#667781; }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center}
+    .app{width:min(920px,100%);height:100vh;display:flex;flex-direction:column;background:#fff}
+    @media (min-width:1000px){ body{padding:8px} .app{height:calc(100vh - 16px);border-radius:16px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.08)} }
+
+    .header{display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--panel);border-bottom:1px solid var(--border)}
+    .avatar{width:40px;height:40px;border-radius:50%;object-fit:cover}
+    .title{display:flex;flex-direction:column}
+    .name{font-weight:600}
+    .status{font-size:12px;color:var(--accent)}
+    .header-right{margin-left:auto;display:flex;gap:8px}
+    .icon-btn{background:transparent;border:0;cursor:pointer;padding:6px;border-radius:8px}
+    .icon-btn:hover{background:#e9edef}
+
+    .chat{flex:1;background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,0)), url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><defs><pattern id="p" width="160" height="160" patternUnits="userSpaceOnUse" patternTransform="translate(20 20)"><circle cx="8" cy="8" r="1.2" fill="%23d1d7db" opacity="0.4"/><circle cx="48" cy="28" r="1" fill="%23d1d7db" opacity="0.3"/><circle cx="120" cy="120" r="1" fill="%23d1d7db" opacity="0.35"/></pattern></defs><rect width="100%" height="100%" fill="%23eae6df"/><rect width="100%" height="100%" fill="url(%23p)"/></svg>');background-attachment:fixed;overflow:auto;padding:20px 18px}
+    .bubble{max-width:75%;padding:8px 10px;border-radius:12px;position:relative;margin:6px 0;line-height:1.35;word-wrap:break-word;white-space:pre-wrap}
+    .me{background:var(--me);margin-left:auto;border-top-right-radius:4px}
+    .bot{background:var(--bot);margin-right:auto;border-top-left-radius:4px}
+    .meta{display:flex;gap:6px;align-items:center;color:var(--muted);font-size:11px;margin-top:4px}
+    .typing{display:inline-block;width:4px;height:4px;background:#9aa0a6;border-radius:50%;margin:0 2px;animation:blink 1.2s infinite ease-in-out}
+    .typing:nth-child(2){animation-delay:.2s} .typing:nth-child(3){animation-delay:.4s}
+    @keyframes blink{0%,80%,100%{opacity:.2} 40%{opacity:1}}
+
+    .chips{display:flex;gap:8px;flex-wrap:wrap;padding:8px 14px;background:var(--panel);border-top:1px solid var(--border)}
+    .chip{font-size:13px;background:#fff;border:1px solid var(--border);padding:6px 10px;border-radius:20px;cursor:pointer}
+    .chip:hover{background:#f6f7f8}
+
+    .composer{display:flex;gap:10px;padding:10px;background:var(--panel);border-top:1px solid var(--border);align-items:center}
+    .field{flex:1;position:relative}
+    .input{width:100%;padding:12px 92px 12px 12px;border-radius:24px;border:1px solid var(--border);background:#fff;font:inherit;outline:none}
+    .attach{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;gap:6px}
+    .small{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--border);background:#fff;cursor:pointer}
+    .small:hover{background:#f6f7f8}
+    .send{background:var(--accent);color:#fff;border:0;border-radius:50%;width:40px;height:40px;display:grid;place-items:center;cursor:pointer}
+    .send:disabled{opacity:.5;cursor:not-allowed}
+
+    .picker{position:absolute;bottom:48px;right:8px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:8px;width:240px;display:none;box-shadow:0 10px 30px rgba(0,0,0,.06)}
+    .picker span{cursor:pointer;padding:4px;border-radius:6px;display:inline-block}
+    .picker span:hover{background:#f0f2f5}
+
+    .sr-only{position:absolute!important;height:1px;width:1px;overflow:hidden;clip:rect(1px,1px,1px,1px);white-space:nowrap}
+  </style>
 </head>
 <body>
-<div id="start-screen">
-  <input id="student-name" placeholder="Dein Name">
-  <input id="student-class" placeholder="Deine Klasse">
-  <input id="search" placeholder="Suche...">
-  <div id="tiles"></div>
-</div>
-
-<div id="chat-screen" class="hidden">
-  <header>
-    <img id="avatar" src="">
-    <div>
-      <div id="chat-name"></div>
-      <small id="status">online</small>
+  <div class="app" role="application" aria-label="Chat mit historischer Person">
+    <div class="header">
+      <img class="avatar" id="avatar" alt="Marie Curie" src="https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Marie_Curie_c1920.png/256px-Marie_Curie_c1920.png" />
+      <div class="title">
+        <div class="name" id="personName">Marie Curie</div>
+        <div class="status" id="status">online</div>
+      </div>
+      <div class="header-right">
+        <button class="icon-btn" id="resetBtn" title="Neustart" aria-label="Neustart">♻️</button>
+      </div>
     </div>
-  </header>
-  <main id="chat"></main>
-  <div id="emoji-bar">
-    <button data-type="positiv">👍</button>
-    <button data-type="negativ">👎</button>
-    <button data-type="nachdenken">🤔</button>
-    <button data-type="krieg">⚔️</button>
-    <button data-type="wissenschaft">🔬</button>
-    <button data-type="religion">🙏</button>
-    <button data-type="sonst">❓</button>
+
+    <div id="chat" class="chat" aria-live="polite" aria-relevant="additions text"></div>
+
+    <div class="chips" id="chips">
+      <button class="chip" data-q="Wer bist du?">Wer bist du?</button>
+      <button class="chip" data-q="Wann und wo bist du geboren?">Wann und wo bist du geboren?</button>
+      <button class="chip" data-q="Wer war Pierre Curie?">Wer war Pierre Curie?</button>
+      <button class="chip" data-q="Welche Preise hast du erhalten?">Welche Preise hast du erhalten?</button>
+      <button class="chip" data-q="Erkläre das genauer">Erkläre das genauer</button>
+    </div>
+
+    <div class="composer">
+      <div class="field">
+        <label class="sr-only" for="input">Nachricht schreiben</label>
+        <input id="input" class="input" placeholder="Nachricht" autocomplete="off" />
+        <div class="attach">
+          <div class="picker" id="picker" aria-label="Emoji-Auswahl">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px">Emojis</div>
+            <div id="emojiGrid" style="line-height:2"></div>
+          </div>
+          <button class="small" id="emojiBtn" title="Emoji">😊</button>
+          <button class="small" id="pdfBtn" title="Chat als PDF speichern" aria-label="Chat als PDF">📄</button>
+        </div>
+      </div>
+      <button id="send" class="send" aria-label="Senden">➤</button>
+    </div>
   </div>
-  <footer>
-    <button id="pdf-export">📄</button>
-    <input id="message" placeholder="Nachricht">
-    <button id="send">➤</button>
-  </footer>
-</div>
 
-<div id="teacher-panel" class="hidden">
-  <label><input type="radio" name="mode" value="neutral" checked> neutral</label><br>
-  <label><input type="radio" name="mode" value="historisch"> historisch gefärbt</label><br>
-  <label><input type="radio" name="mode" value="zitat"> Zitate + Erklärung</label>
-</div>
+  <!-- lightweight libs for PDF export -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
-<script type="module">
-const figures=[
- {name:"Albert Einstein",img:"https://upload.wikimedia.org/wikipedia/commons/d/d3/Albert_Einstein_Head.jpg"},
- {name:"Adolf Hitler",img:"https://upload.wikimedia.org/wikipedia/commons/9/9c/Hitler_portrait_crop.jpg"},
- {name:"Jesus",img:"https://upload.wikimedia.org/wikipedia/commons/8/88/Jesus_Pantocrator_icon.jpg"},
- {name:"Heinrich VIII.",img:"https://upload.wikimedia.org/wikipedia/commons/3/3a/HenryVIII.jpg"},
- {name:"Pelé",img:"https://upload.wikimedia.org/wikipedia/commons/8/89/Pele_conference.jpg"},
- {name:"Maradona",img:"https://upload.wikimedia.org/wikipedia/commons/4/4b/Diego_Maradona_2012.jpg"},
- {name:"Stalin",img:"https://upload.wikimedia.org/wikipedia/commons/4/45/Stalin_Full_Image.jpg"},
- {name:"Da Vinci",img:"https://upload.wikimedia.org/wikipedia/commons/e/e2/Leonardo_da_Vinci_-_presumed_self-portrait_-_WGA12798.jpg"},
- {name:"Curie",img:"https://upload.wikimedia.org/wikipedia/commons/6/69/Marie_Curie_c1920.jpg"},
- {name:"Napoleon",img:"https://upload.wikimedia.org/wikipedia/commons/5/50/Napoleon_Bonaparte.jpg"},
- {name:"Picasso",img:"https://upload.wikimedia.org/wikipedia/commons/9/99/Portrait_de_Picasso%2C_1908.jpg"},
- {name:"Elizabeth II.",img:"https://upload.wikimedia.org/wikipedia/commons/3/3d/Queen_Elizabeth_II_in_March_2015.jpg"}
-];
-const tileBox=document.getElementById('tiles');
-figures.forEach(f=>{
- const div=document.createElement('div');
- div.className='tile';
- const img=document.createElement('img');
- img.src=f.img;
- img.alt=f.name;
- img.onerror=()=>{img.remove();div.prepend('👤');};
- const span=document.createElement('span');
- span.textContent=f.name;
- div.appendChild(img);
- div.appendChild(span);
- div.onclick=()=>startChat(f);
- tileBox.appendChild(div);
-});
-document.getElementById('search').addEventListener('input',e=>{
- const t=e.target.value.toLowerCase();
- Array.from(tileBox.children).forEach(c=>{
-  c.style.display=c.innerText.toLowerCase().includes(t)?'flex':'none';
- });
-});
-let currentFigure="";
-function startChat(figure){
- document.getElementById('start-screen').classList.add('hidden');
- document.getElementById('chat-screen').classList.remove('hidden');
- document.getElementById('chat-name').textContent=figure.name;
- const header=document.querySelector('#chat-screen header');
- const av=document.getElementById('avatar');
- av.src=figure.img;
- av.onerror=()=>{av.remove();const sp=document.createElement('span');sp.textContent='👤';header.prepend(sp);};
- currentFigure=figure.name;
- addBotMessage("Hallo, ich bin "+figure.name+". Frag mich etwas!");
-}
+  <script>
+    // --- DOM ---
+    const chatEl = document.getElementById('chat');
+    const inputEl = document.getElementById('input');
+    const sendBtn = document.getElementById('send');
+    const pdfBtn = document.getElementById('pdfBtn');
+    const emojiBtn = document.getElementById('emojiBtn');
+    const picker = document.getElementById('picker');
+    const statusEl = document.getElementById('status');
+    const nameEl = document.getElementById('personName');
+    const avatarEl = document.getElementById('avatar');
 
-const emoji={positiv:'👍',negativ:'👎',nachdenken:'🤔',krieg:'⚔️',wissenschaft:'🔬',religion:'🙏',sonst:'❓'};
-document.querySelectorAll('#emoji-bar button').forEach(b=>{
- b.onclick=()=>addUserMessage(emoji[b.dataset.type]);
-});
+    // --- Personas (erweiterbar) ---
+    const PERSONS = [{
+      id: 'marie-curie',
+      name: 'Marie Curie',
+      titles: { de:'Marie Curie', en:'Marie Curie', fr:'Marie Curie', pl:'Maria Skłodowska-Curie', ru:'Мария Склодовская-Кюри', ar:'ماري كوري', tr:'Marie Curie', ku:'Marie Curie' },
+      avatar: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Marie_Curie_c1920.png/256px-Marie_Curie_c1920.png'
+    }];
+    let currentPerson = PERSONS[0];
 
-document.getElementById('send').onclick=sendMessage;
-document.getElementById('message').addEventListener('keydown',e=>{
- if(e.key==='Enter') sendMessage();
-});
-document.addEventListener('keydown',e=>{
- if(e.ctrlKey && e.key.toLowerCase()==='l'){
-  document.getElementById('teacher-panel').classList.toggle('hidden');
- }
-});
-let mode="neutral";
-Array.from(document.getElementsByName('mode')).forEach(r=>r.onchange=e=>{mode=e.target.value;});
-document.getElementById('pdf-export').onclick=exportPDF;
+    // Optional: ?person=marie-curie
+    (function(){ try{ const url=new URL(location.href); const pid=url.searchParams.get('person'); if(pid){ const p=PERSONS.find(x=>x.id===pid); if(p) currentPerson=p; } }catch(e){} })();
+    function getCurrentTitle(lang){ const t=currentPerson.titles||{}; return t[lang]||currentPerson.name; }
 
-function addUserMessage(t){
- const div=document.createElement('div');
- div.className='bubble user';
- div.textContent=t;
- document.getElementById('chat').appendChild(div);
- scrollChat();
-}
-function addBotMessage(t){
- const div=document.createElement('div');
- div.className='bubble bot';
- div.textContent=t;
- document.getElementById('chat').appendChild(div);
- scrollChat();
-}
-function scrollChat(){
- const m=document.getElementById('chat');
- m.scrollTop=m.scrollHeight;
-}
+    // --- UI helpers ---
+    const DEMO_EMOJIS = ['🙂','😊','😉','🤓','🧪','🔬','📚','🏅','💡','🇵🇱','🇫🇷','🧫','🧠','✨','👍','🙌','❓','❗'];
+    function timeNow(){ const d=new Date(); return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}); }
+    function addBubble(text, who='bot'){ const b=document.createElement('div'); b.className='bubble '+(who==='me'?'me':'bot'); b.textContent=text; const meta=document.createElement('div'); meta.className='meta'; meta.textContent=timeNow(); b.appendChild(meta); chatEl.appendChild(b); chatEl.scrollTop=chatEl.scrollHeight; return b; }
+    function addTyping(){ const c=document.createElement('div'); c.className='bubble bot'; c.innerHTML='<span class=\"typing\"></span><span class=\"typing\"></span><span class=\"typing\"></span><div class=\"meta\">'+timeNow()+'</div>'; chatEl.appendChild(c); chatEl.scrollTop=chatEl.scrollHeight; return c; }
+    function setStatus(s){ statusEl.textContent=s; }
 
-async function sendMessage(){
- const inp=document.getElementById('message');
- const text=inp.value.trim();
- if(!text) return;
- addUserMessage(text);
- inp.value="";
- const reply=await getAnswer(text);
- addBotMessage(reply);
-}
+    // Emoji picker
+    (function initPicker(){ const grid=document.getElementById('emojiGrid'); DEMO_EMOJIS.forEach(e=>{ const span=document.createElement('span'); span.textContent=e; span.onclick=()=>{ inputEl.value+=e; picker.style.display='none'; inputEl.focus(); }; grid.appendChild(span); }); emojiBtn.onclick=()=>{ picker.style.display = picker.style.display==='block' ? 'none' : 'block'; }; document.addEventListener('click',(ev)=>{ if(!picker.contains(ev.target) && ev.target!==emojiBtn){ picker.style.display='none'; }}); })();
 
-async function getAnswer(q){
- await ensureEmbedder();
- try{
-  const url='https://de.wikipedia.org/api/rest_v1/page/summary/'+encodeURIComponent(currentFigure);
-  const res=await fetch(url);
-  if(!res.ok) throw new Error('net');
-  const data=await res.json();
-  let txt=data.extract||'';
-  if(!txt) return "Dazu kann ich dir leider nichts sagen.";
-  let first=txt.split('. ')[0];
-  first=first.replace(currentFigure,'Ich');
-  if(mode==='historisch'){first='In meiner Zeit: '+first;}
-  if(mode==='zitat'){
-    const res2=await fetch('https://de.wikipedia.org/api/rest_v1/page/plain/'+encodeURIComponent(currentFigure));
-    if(res2.ok){
-      const t=await res2.text();
-      const line=t.split('\n').find(s=>s.includes('„'));
-      if(line){
-        const quote=line.split('„')[1].split('“')[0];
-        return '„'+quote+'“ - '+first;
+    // Quick chips
+    document.getElementById('chips').addEventListener('click', (e)=>{ if(e.target.classList.contains('chip')){ inputEl.value = e.target.dataset.q; send(); }});
+
+    // --- Language detection without regex (de/en/fr/pl/ru/ar/tr/ku) ---
+    function hasScriptRange(text, start, end){ for(let i=0;i<text.length;i++){ const c=text.charCodeAt(i); if(c>=start && c<=end) return true; } return false; }
+    function detectLang(text){
+      const t=(text||'').toLowerCase();
+      const score={de:0,en:0,fr:0,pl:0,ru:0,ar:0,tr:0,ku:0};
+      const bump=(arr,k)=>arr.forEach(w=>{ if(t.indexOf(w)>=0) score[k]++; });
+      bump(['wer','wann','wo','warum','wie','erkläre','geburt','nobel','forschung','lebenslauf','studium','preis','tochter'],'de');
+      bump(['who','when','where','why','how','explain','born','nobel','research','biography','study','prize','daughter'],'en');
+      bump(['qui','quand','où','pourquoi','comment','née','prix','biographie','recherche'],'fr');
+      bump(['kto','kiedy','gdzie','dlaczego','jak','urodzona','nagroda','biografia','badania'],'pl');
+      bump(['кто','когда','где','почему','как','родил','родилась','нобел','биограф','исслед','дочь'],'ru');
+      bump(['من','متى','أين','لماذا','كيف','ولدت','جائزة','سيرة','بحث','ابنة','نوبل'],'ar');
+      bump(['kim','ne zaman','nerede','neden','nasıl','açıkla','doğdu','ödül','biyografi','araştırma','kızı','nobel'],'tr');
+      bump(['kî','kengî','li ku','çima','çawa','terîf','jidayikbû','xelat','jiyanname','lêkolîn','keç','nobel'],'ku');
+      if(hasScriptRange(text,1024,1279)) score.ru+=2;   // Cyrillic
+      if(hasScriptRange(text,1536,1791)) score.ar+=2;   // Arabic
+      const best=Object.entries(score).sort((a,b)=>b[1]-a[1])[0];
+      if(best[1]===0){ const nav=(navigator.language||'de').slice(0,2); return ['de','en','fr','pl','ru','ar','tr','ku'].includes(nav)?nav:'de'; }
+      return best[0];
+    }
+    function langHost(lang){ const map={de:'de',en:'en',fr:'fr',pl:'pl',ru:'ru',ar:'ar',tr:'tr',ku:'ku'}; return (map[lang]||'de')+'.wikipedia.org'; }
+
+    // --- Wikipedia fetch (nur Excerpts, keine Links) ---
+    async function fetchShortBio(lang){
+      const host=langHost(lang); const title=encodeURIComponent(getCurrentTitle(lang));
+      const url=`https://${host}/w/api.php?action=query&prop=extracts&explaintext=1&exsentences=3&titles=${title}&format=json&origin=*`;
+      const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status);
+      const j=await r.json(); const page=Object.values(j.query.pages)[0]; return page.extract||'';
+    }
+    async function fetchMoreBio(lang, n){
+      const host=langHost(lang); const title=encodeURIComponent(getCurrentTitle(lang));
+      const url=`https://${host}/w/api.php?action=query&prop=extracts&explaintext=1&exsentences=${n||12}&titles=${title}&format=json&origin=*`;
+      const r=await fetch(url); if(!r.ok) throw new Error('HTTP '+r.status);
+      const j=await r.json(); const page=Object.values(j.query.pages)[0]; return page.extract||'';
+    }
+
+    // --- Text helpers (ohne Regex) ---
+    function trimSentences(text, n){
+      const out=[]; let cur=''; const enders=['.','!','?','؟'];
+      for(const ch of (text||'')){ cur+=ch; if(enders.includes(ch)){ if(cur.trim()) out.push(cur.trim()); cur=''; if(out.length>=n) break; } }
+      if(out.length<n && cur.trim()) out.push(cur.trim());
+      return out.slice(0,n).join(' ');
+    }
+    function simplify(text){ return (text||'').replace(/\\s+/g,' ').trim(); }
+
+    // Einleitung in Ich-Form aus dem ersten Satz
+    function firstPersonizeIntro(text, lang){
+      const title=getCurrentTitle(lang);
+      const first=trimSentences(simplify(text),1);
+      let rest=first;
+      const variants=[title,'Marie Curie','Maria Skłodowska-Curie','Мария Склодовская-Кюри','ماري كوري'];
+      for(const v of variants){
+        const low=rest.toLowerCase(), vl=v.toLowerCase();
+        if(low.startsWith(vl)){ rest=rest.slice(v.length).trim(); if(rest[0]==='—'||rest[0]==='-'||rest[0]===',') rest=rest.slice(1).trim(); }
+      }
+      if(lang==='ar') return 'أنا '+title+'. '+rest;
+      if(lang==='tr') return 'Ben '+title+'’yim. '+rest;
+      if(lang==='pl') return 'Jestem '+title+'. '+rest;
+      if(lang==='fr') return 'Je suis '+title+'. '+rest;
+      if(lang==='ru') return 'Я — '+title+'. '+rest;
+      if(lang==='ku') return 'Ez '+title+' me. '+rest;
+      if(lang==='en') return 'I am '+title+'. '+rest;
+      return 'Ich bin '+title+'. '+rest;
+    }
+
+    // Inhalte nur biografisch; keine „How-to“-Hilfen
+    function isOutOfScope(q){
+      const t=(q||'').toLowerCase();
+      const bad=['anleitung','how to','bau','experiment','mischen','chemikalien','säure','acid','explosion','gefähr','danger','опыт','кислота','реактор','مواد','تجربة','حمض','متفجر','reaktör','deney','tehlike','ceribandin','têcrûbe','aside'];
+      const sci=['radioaktiv','strahlung','reaktor','experiment','рад','إشعاع','şewitandin'];
+      if(bad.some(w=>t.includes(w))) return true;
+      if((t.includes('erklär')||t.includes('erkläre')||t.includes('was ist')||t.includes('how works')||t.includes('how does')||t.includes('объясн')||t.includes('ما هو')||t.includes('كيف يعمل')||t.includes('nedir')||t.includes('çalışır')||t.includes('çawa kare dike')) && sci.some(w=>t.includes(w))) return true;
+      return false;
+    }
+
+    // --- Bot-Logik: kurz antworten, „Erkläre das genauer“ => mehr Sätze ---
+    async function botAnswer(userText){
+      const lang=detectLang(userText);
+      setStatus('tippt…');
+      const typing=addTyping();
+      try{
+        const q=(userText||'').trim(); let reply='';
+        if(isOutOfScope(q)){
+          reply=(lang==='de')?'Ich spreche hier nur über mein Leben und meinen Werdegang. Über Experimente gebe ich keine Hinweise.':
+                (lang==='fr')?'Je parle seulement de ma vie et de mon parcours.':
+                (lang==='en')?'I only talk about my life and path here.':
+                (lang==='pl')?'Mówię tutaj tylko o moim życiu i drodze.':
+                (lang==='ru')?'Я говорю здесь только о своей жизни и пути.':
+                (lang==='ar')?'أتحدث هنا فقط عن حياتي وطريقي.':
+                (lang==='tr')?'Burada yalnızca hayatımdan ve yolumdan bahsediyorum.':
+                               'Tenê derbarê jiyana min û rêya min diaxivim.';
+        } else if(q.toLowerCase().includes('erkläre das genauer') || q.toLowerCase().includes('explain more') || q.toLowerCase().includes('mehr anzeigen')){
+          const more=await fetchMoreBio(lang,18);
+          reply=trimSentences(simplify(more),8);
+        } else {
+          const short=await fetchShortBio(lang);
+          reply=trimSentences(simplify(short),3);
+        }
+        setTimeout(()=>{ try{ typing.remove(); }catch(e){} addBubble(reply + ((/danke|cool|😊|🙂|👍|emoji/i.test(q))?' 🙂🔬':''),'bot'); }, 380);
+      } catch(e){
+        try{ typing.remove(); }catch(_){}
+        addBubble('Entschuldige, der Abruf war gestört. Bitte versuche es erneut.','bot');
+      } finally {
+        setStatus('online');
       }
     }
-  }
-  return first+'.';
- }catch(e){
-  return "Dazu kann ich dir leider nichts sagen.";
- }
-}
 
-let generator=null;
-async function ensureEmbedder(){
- if(generator) return;
- try{
-  const mod=await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.6.0');
-  generator=mod;
- }catch(e){
-  generator=null;
- }
-}
+    // --- Senden/Intro/Reset ---
+    async function send(){ const v=inputEl.value.trim(); if(!v) return; addBubble(v,'me'); inputEl.value=''; await botAnswer(v); }
+    sendBtn.addEventListener('click',send);
+    inputEl.addEventListener('keydown',(e)=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); }});
+    document.getElementById('resetBtn').addEventListener('click',()=>{ chatEl.innerHTML=''; intro(); });
 
-async function exportPDF(){
- try{
-  const mod=await import('https://cdn.jsdelivr.net/npm/html2pdf.js@0.10.1/dist/html2pdf.bundle.min.js');
-  mod.default(document.getElementById('chat'));
- }catch(e){
-  window.print();
- }
-}
-</script>
+    function intro(){
+      nameEl.textContent=currentPerson.name;
+      avatarEl.src=currentPerson.avatar;
+      const lang=detectLang('');
+      fetchShortBio(lang)
+        .then(ex=> addBubble(firstPersonizeIntro(ex||'',lang),'bot'))
+        .catch(()=> addBubble('Bonjour. Ich bin '+currentPerson.name+'. Stelle mir Fragen zu meinem Leben und meiner Arbeit – kurz und klar.','bot'));
+    }
+
+    // --- PDF-Export (Chatbereich als Bild in A4) ---
+    pdfBtn.addEventListener('click', async ()=>{
+      const { jsPDF } = window.jspdf;
+      const temp=12;
+      const clone=chatEl.cloneNode(true);
+      clone.style.height='auto'; clone.style.maxHeight='none';
+      const box=document.createElement('div'); box.style.position='fixed'; box.style.left='-99999px'; box.appendChild(clone); document.body.appendChild(box);
+      const canvas=await html2canvas(clone,{scale:2}); document.body.removeChild(box);
+      const img=canvas.toDataURL('image/png');
+      const pdf=new jsPDF({orientation:'p',unit:'pt',format:'a4'});
+      const W=pdf.internal.pageSize.getWidth(), H=pdf.internal.pageSize.getHeight();
+      const ratio=Math.min((W-2*temp)/canvas.width,(H-2*temp)/canvas.height);
+      const w=canvas.width*ratio, h=canvas.height*ratio, x=(W-w)/2, y=temp;
+      pdf.addImage(img,'PNG',x,y,w,h);
+      pdf.save('chat_'+(currentPerson.id||'person')+'.pdf');
+    });
+
+    // Start
+    intro();
+  </script>
 </body>
 </html>
